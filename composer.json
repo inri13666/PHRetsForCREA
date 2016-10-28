@@ -1,0 +1,17 @@
+{
+    "name": "mesav/ph-rets-for-crea",
+    "type": "library",
+    "require": {
+        "guzzlehttp/guzzle": "5.3.*",
+        "monolog/monolog": "*",
+        "illuminate/container": "^5.3",
+        "illuminate/support": "^5.3",
+        "symfony/console": "^3.1"
+    },
+    "authors": [
+        {
+            "name": "Nikita Makarov",
+            "email": "mesaverde228@gmail.com"
+        }
+    ]
+}

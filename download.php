@@ -1,45 +1,40 @@
 <?PHP
+require 'vendor/autoload.php';
 
-use PHRETS\Configuration;
-use PHRETS\Http\Client;
-use PHRETS\Session;
+spl_autoload_register(function ($class) {
+    $data = explode('\\', $class);
+    if (in_array('PHRETS', (array)($data[0]))) {
+        require_once dirname(__FILE__) . DIRECTORY_SEPARATOR . $class . '.php';
+    }
+}, false);
 
-function __autoload($class_name)
-{
-    include str_replace("\\", "/", $class_name) . '.php';
-}
+$username = 'REPLACE_ME';
+$password = 'REPLACE_ME';
 
-/* Script Variables */
-// Lots of output, saves requests to a local file.
-$debugMode = false; 
+$console = new \Symfony\Component\Console\Output\ConsoleOutput();
+$debugMode = true;
 // @TODO Set this to something like "-2 years" to get all listings, then choose "-2 days" for on-going updates, etc.
-$TimeBackPull = "-2 days";
+$TimeBackPull = "-200 days";
 date_default_timezone_set('America/New_York');
 
 /* Do Not Edit Zone ------------------- */
 $RETS_LimitPerQuery = 100;
 /* END Do Not Edit Zone --------------- */
 
-$config = new PHRETS\Configuration;
-$config = Configuration::load([
+$config = \PHRETS\Configuration::load([
     'login_url' => 'http://data.crea.ca/Login.svc/Login',
-    'username' => 'VJ4ExvOz6mLNP6d1kq0aG22r',
-    'password' => 'dwdmTV2hZ6GqtJaqskADWwc0',
-    'user_agent' => 'MyUserAgent/1.0', // @TODO Make this yours or remove it
+    'username' => $username,
+    'password' => $password,
+    //'user_agent' => 'MyUserAgent/1.0', // @TODO Make this yours or remove it
     'rets_version' => '1.7.2'
 ]);
-$config->setLoginUrl('http://data.crea.ca/Login.svc/Login')
-        ->setUsername('VJ4ExvOz6mLNP6d1kq0aG22r')
-        ->setPassword('dwdmTV2hZ6GqtJaqskADWwc0')
-        ->setRetsVersion('1.7.2');
-		
+
 $rets = new \PHRETS\Session($config);
 
-if($debugMode /* DEBUG OUTPUT */)
-{
-	$log = new \Monolog\Logger('PHRETS');
-	$log->pushHandler(new \Monolog\Handler\StreamHandler('php://stdout', \Monolog\Logger::DEBUG));
-	$rets->setLogger($log);
+if ($debugMode) {
+    $log = new \Monolog\Logger('PHRETS');
+    $log->pushHandler(new \Monolog\Handler\StreamHandler('php://stdout', \Monolog\Logger::DEBUG));
+    $rets->setLogger($log);
 }
 
 $connect = $rets->Login();
@@ -49,61 +44,57 @@ $connect = $rets->Login();
 
 function downloadPhotos($listingID)
 {
-	global $RETS, $RETS_PhotoSize, $debugMode;
-	
-	if(!$downloadPhotos)
-	{
-		if($debugMode) error_log("Not Downloading Photos");
-		return;
-	}
+    global $RETS, $RETS_PhotoSize, $debugMode;
 
-	$photos = $RETS->GetObject("Property", $RETS_PhotoSize, $listingID, '*');
-	
-	if(!is_array($photos))
-	{
-		if($debugMode) error_log("Cannot Locate Photos");
-		return;
-	}
+    if (!$downloadPhotos) {
+        if ($debugMode) error_log("Not Downloading Photos");
 
-	if(count($photos) > 0)
-	{
-		$count = 0;
-		foreach($photos as $photo)
-		{
-			if(
-				(!isset($photo['Content-ID']) || !isset($photo['Object-ID']))
-				||
-				(is_null($photo['Content-ID']) || is_null($photo['Object-ID']))
-				||
-				($photo['Content-ID'] == 'null' || $photo['Object-ID'] == 'null')
-			)
-			{
-				continue;
-			}
-			
-			$listing = $photo['Content-ID'];
-			$number = $photo['Object-ID'];
-			$destination = $listingID."_".$number.".jpg";
-			$photoData = $photo['Data'];
-			
-			/* @TODO SAVE THIS PHOTO TO YOUR PHOTOS FOLDER
-			 * Easiest option:
-			 * 	file_put_contents($destination, $photoData);
-			 * 	http://php.net/function.file-put-contents
-			 */
-			 
-			$count++;
-		}
-		
-		if($debugMode)
-			error_log("Downloaded ".$count." Images For '".$listingID."'");
-	}
-	elseif($debugMode)
-		error_log("No Images For '".$listingID."'");
-	
-	// For good measure.
-	if(isset($photos)) $photos = null;
-	if(isset($photo)) $photo = null;
+        return;
+    }
+
+    $photos = $RETS->GetObject("Property", $RETS_PhotoSize, $listingID, '*');
+
+    if (!is_array($photos)) {
+        if ($debugMode) error_log("Cannot Locate Photos");
+
+        return;
+    }
+
+    if (count($photos) > 0) {
+        $count = 0;
+        foreach ($photos as $photo) {
+            if (
+                (!isset($photo['Content-ID']) || !isset($photo['Object-ID']))
+                ||
+                (is_null($photo['Content-ID']) || is_null($photo['Object-ID']))
+                ||
+                ($photo['Content-ID'] == 'null' || $photo['Object-ID'] == 'null')
+            ) {
+                continue;
+            }
+
+            $listing = $photo['Content-ID'];
+            $number = $photo['Object-ID'];
+            $destination = $listingID . "_" . $number . ".jpg";
+            $photoData = $photo['Data'];
+
+            /* @TODO SAVE THIS PHOTO TO YOUR PHOTOS FOLDER
+             * Easiest option:
+             *    file_put_contents($destination, $photoData);
+             *    http://php.net/function.file-put-contents
+             */
+
+            $count++;
+        }
+
+        if ($debugMode)
+            error_log("Downloaded " . $count . " Images For '" . $listingID . "'");
+    } elseif ($debugMode)
+        error_log("No Images For '" . $listingID . "'");
+
+    // For good measure.
+    if (isset($photos)) $photos = null;
+    if (isset($photo)) $photo = null;
 }
 
 /* NOTES
@@ -119,9 +110,18 @@ function downloadPhotos($listingID)
  *
  * Each time you get Listing Data, you want to save this data and then download it's images...
  */
- 
-echo("-----GETTING ALL ID's-----");
-$results = $rets->Search('Property', 'Property', '(LastUpdated='.date('Y-m-d', strtotime($TimeBackPull)).')', ['Limit' => 3, 'Format' => 'STANDARD-XML', 'Count' => 1]);
-print_r($results);
 
+$console->writeln("-----GETTING ALL ID's-----");
+//$results = $rets->Search('Property', 'Property', '(LastUpdated=' . date('Y-m-d', strtotime($TimeBackPull)) . ')', ['Limit' => 10, 'Format' => 'STANDARD-XML', 'Count' => 1]);
+$results = $rets->Search('Property', 'Property', 'ID=0+', ['Limit' => 1, 'Format' => 'STANDARD-XML']);
+$table = new \Symfony\Component\Console\Helper\Table($console);
+$table->setHeaders(array('Key', 'Value'));
+/** @var \PHRETS\Models\Search\Record $item */
+foreach ($results->getIterator() as $item) {
+    var_dump($item->getFields());
+    foreach($item->getFields() as $field){
+        $table->addRow([$field, $item->get($field)]);
+    }
+}
+$table->render();
 $rets->Disconnect();
